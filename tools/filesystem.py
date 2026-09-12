@@ -1,4 +1,4 @@
-"""Filesystem tools: read_file, write_file, list_files."""
+"""Filesystem tools: read_file, write_file, edit_file, list_files, undo."""
 from __future__ import annotations
 
 import fnmatch
@@ -10,6 +10,11 @@ HIDDEN_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__",
                ".next", "dist", "build", ".idea", ".vscode", "target"}
 
 MAX_LINES_DEFAULT = 2000
+
+# Undo stack: (real_path, display_path, previous_bytes_or_None), newest last.
+# Session-scoped (in memory). Creating a file records None -> undo deletes it.
+_UNDO: list[tuple[str, str, bytes | None]] = []
+_UNDO_CAP = 50
 
 
 def _read_gitignore(workspace: str) -> list[str]:
@@ -86,6 +91,46 @@ def read_file(path: str, workspace: str = ".", max_file_size: int = 100_000,
     return "\n".join(out)
 
 
+def _push_undo(real: str, display: str) -> None:
+    try:
+        with open(real, "rb") as f:
+            prev: bytes | None = f.read()
+    except OSError:
+        prev = None
+    _UNDO.append((real, display, prev))
+    del _UNDO[:-_UNDO_CAP]
+
+
+def undo_last_write() -> str:
+    """Restore the most recently overwritten/created file. Never raises."""
+    if not _UNDO:
+        return "Nothing to undo."
+    real, display, prev = _UNDO.pop()
+    try:
+        if prev is None:
+            if os.path.isfile(real):
+                os.remove(real)
+            return f"Undone: removed {display} (it did not exist before)."
+        with open(real, "wb") as f:
+            f.write(prev)
+        return f"Undone: restored {display}."
+    except OSError as e:
+        return f"ERROR: cannot undo: {e}"
+
+
+def _read_text(real: str) -> tuple[str | None, str]:
+    """Return (text, error). '' error means success."""
+    for enc in ("utf-8", "utf-8-sig"):
+        try:
+            with open(real, "r", encoding=enc) as f:
+                return f.read(), ""
+        except UnicodeDecodeError:
+            continue
+        except OSError as e:
+            return None, f"ERROR: cannot read file: {e}"
+    return None, "ERROR: file is not UTF-8 text; use read_file to inspect."
+
+
 def write_file(path: str, content: str, workspace: str = ".") -> str:
     """Create or replace a file inside the workspace."""
     try:
@@ -96,6 +141,7 @@ def write_file(path: str, content: str, workspace: str = ".") -> str:
         parent = os.path.dirname(real)
         if parent:
             os.makedirs(parent, exist_ok=True)
+        _push_undo(real, path)
         data = content.encode("utf-8")
         with open(real, "wb") as f:
             f.write(data)
@@ -103,6 +149,38 @@ def write_file(path: str, content: str, workspace: str = ".") -> str:
         return f"OK: wrote {path} ({len(data)} bytes, {nlines} lines)"
     except OSError as e:
         return f"ERROR: cannot write file: {e}"
+
+
+def edit_file(path: str, old_string: str, new_string: str,
+              workspace: str = ".") -> str:
+    """Surgical replacement: old_string must occur exactly once."""
+    if not old_string:
+        return "ERROR: edit_file needs a non-empty {old_string}."
+    try:
+        real = resolve_in_workspace(workspace, path)
+    except ValueError as e:
+        return f"ERROR: {e}"
+    if not os.path.isfile(real):
+        return f"ERROR: file not found: {path}"
+    text, err = _read_text(real)
+    if err:
+        return err
+    assert text is not None
+    n = text.count(old_string)
+    if n == 0:
+        return (f"ERROR: old_string not found in {path}. "
+                "Read the file first and copy the exact text.")
+    if n > 1:
+        return (f"ERROR: old_string matches {n} times in {path}. "
+                "Include more surrounding lines to make it unique.")
+    _push_undo(real, path)
+    line_no = text[:text.index(old_string)].count("\n") + 1
+    try:
+        with open(real, "w", encoding="utf-8") as f:
+            f.write(text.replace(old_string, new_string, 1))
+    except OSError as e:
+        return f"ERROR: cannot write file: {e}"
+    return f"OK: edited {path} (1 replacement, line ~{line_no})"
 
 
 def list_files(path: str = ".", workspace: str = ".",

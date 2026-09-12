@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
-from tools.filesystem import list_files, read_file, write_file
+from tools.filesystem import edit_file, list_files, read_file, write_file
+from tools.search import glob_files, grep_files
 from tools.terminal import run_command
-from tools.web import web_search
+from tools.web import web_fetch, web_search
 
 # Compact schemas shown to the model exactly once (kept tiny for 7B models).
 TOOL_SCHEMAS = [
@@ -34,6 +35,28 @@ TOOL_SCHEMAS = [
         "name": "web_search",
         "desc": "Search the web (DuckDuckGo, no key). Use sparingly: results eat context.",
         "args": {"query": "string (required)", "max_results": "int?, default 5"},
+    },
+    {
+        "name": "web_fetch",
+        "desc": "Fetch a URL as readable text (capped).",
+        "args": {"url": "string (required)"},
+    },
+    {
+        "name": "edit_file",
+        "desc": "Surgical string replacement; old_string must occur exactly once.",
+        "args": {"path": "string (required)", "old_string": "string (required)",
+                 "new_string": "string (required)"},
+    },
+    {
+        "name": "grep_files",
+        "desc": "Regex-search file contents. Returns file:line: matches.",
+        "args": {"pattern": "string (required)", "path": "string, default '.'",
+                 "include": "glob, default '*'"},
+    },
+    {
+        "name": "glob_files",
+        "desc": "Find files by name pattern, e.g. **/*.py.",
+        "args": {"pattern": "string, default '**/*.py'", "path": "string, default '.'"},
     },
 ]
 
@@ -70,12 +93,40 @@ def _web(a: dict, ws: str, cfg) -> str:
     return web_search(a["query"], a.get("max_results", 5))
 
 
+def _fetch(a: dict, ws: str, cfg) -> str:
+    if "url" not in a:
+        return "ERROR: web_fetch needs {url}."
+    return web_fetch(a["url"])
+
+
+def _edit(a: dict, ws: str, cfg) -> str:
+    if not all(k in a for k in ("path", "old_string", "new_string")):
+        return "ERROR: edit_file needs {path, old_string, new_string}."
+    return edit_file(a["path"], a["old_string"], a["new_string"], workspace=ws)
+
+
+def _grep(a: dict, ws: str, cfg) -> str:
+    if "pattern" not in a:
+        return "ERROR: grep_files needs {pattern}."
+    return grep_files(a["pattern"], a.get("path", "."),
+                      workspace=ws, include=a.get("include", "*"))
+
+
+def _glob(a: dict, ws: str, cfg) -> str:
+    return glob_files(a.get("pattern", "**/*.py"), a.get("path", "."),
+                      workspace=ws)
+
+
 _DISPATCH: dict[str, Callable[[dict, str, Any], str]] = {
     "read_file": _read,
     "write_file": _write,
     "list_files": _list,
     "run_command": _run,
     "web_search": _web,
+    "web_fetch": _fetch,
+    "edit_file": _edit,
+    "grep_files": _grep,
+    "glob_files": _glob,
 }
 
 TOOLS = tuple(_DISPATCH.keys())

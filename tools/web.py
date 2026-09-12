@@ -104,6 +104,39 @@ def _wikipedia(query: str, max_results: int) -> str:
     return "\n".join(lines)
 
 
+FETCH_MAX_CHARS = 6000
+
+
+def web_fetch(url: str) -> str:
+    """Fetch a URL and return its readable text (tags/scripts stripped)."""
+    url = (url or "").strip()
+    if not url.startswith(("http://", "https://")):
+        return "ERROR: web_fetch needs a full http(s) {url}."
+    try:
+        req = urllib.request.Request(url, headers={**UA, "Accept": "text/html,text/plain"})
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            ctype = r.headers.get("Content-Type", "")
+            if "html" not in ctype and "text" not in ctype:
+                return f"ERROR: unsupported content ({ctype or 'unknown'}); not a page."
+            page = r.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        return f"ERROR: fetch failed (HTTP {e.code})."
+    except Exception as e:  # noqa: BLE001 - offline? report, don't crash
+        return f"ERROR: fetch failed: {e}."
+    # Drop scripts/styles, then all tags; collapse whitespace.
+    page = re.sub(r"(?is)<(script|style|nav|footer)[^>]*>.*?</\1>", " ", page)
+    text = _clean(re.sub(r"\s+", " ", page))
+    title = ""
+    m = re.search(r"(?is)<title[^>]*>(.*?)</title>", page)
+    if m:
+        title = _clean(m.group(1))
+    head = f"FETCH: {url}" + (f" — {title}" if title else "")
+    body = text[:FETCH_MAX_CHARS]
+    if len(text) > FETCH_MAX_CHARS:
+        body += "\n... [PAGE TRUNCATED]"
+    return head + "\n" + body
+
+
 def web_search(query: str, max_results: int = MAX_RESULTS) -> str:
     """Search the web. Returns capped title/url/snippet list, never raises."""
     query = (query or "").strip()

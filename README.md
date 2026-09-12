@@ -3,7 +3,7 @@
 A minimal terminal coding agent that runs **entirely against a local Ollama model**.
 Built from first principles for **small LLMs (~7–8B) with ~8K context windows**.
 
-No LangChain, no frameworks, no cloud. Five tools, one loop, one context budget.
+No LangChain, no frameworks, no cloud. Nine tools, one loop, one context budget.
 
 ```
 User → CLI → Agent → Ollama → tool call? ──YES──▶ execute → context ──▶ Ollama …
@@ -80,23 +80,40 @@ mini-agent  |  Model: qwen3:8b  |  Context: 8192  |  Workspace: .../workspace
 ✓ ... final answer
 ```
 
-Commands: `/help` `/clear` `/context` `/tools` `/model` `/quit`
+Commands: `/help` `/clear` `/compact` `/init` `/undo` `/context` `/tools` `/model` `/quit`
 
-## Tools (v0.1: four local tools + web search)
+One-shot (non-interactive) runs and per-run overrides:
+
+```bash
+tinyagent "fix the failing test in calc.py"
+tinyagent -m qwen3-local:latest -w C:\Projects\myapp "list the project layout"
+```
+
+Mention files inline with `@path` — the contents are attached (capped):
+
+## Tools
 
 - `read_file {path, start_line?, end_line?}` — numbered lines, encoding-tolerant,
   flags truncation, range reads for big files.
 - `write_file {path, content}` — creates parents, stays in workspace, reports bytes/lines.
+- `edit_file {path, old_string, new_string}` — surgical replacement;
+  `old_string` must occur exactly once (include context lines to disambiguate).
 - `list_files {path?}` — depth-limited tree, hides `.git/node_modules/.venv/...`,
   respects `.gitignore`.
+- `glob_files {pattern?, path?}` — find files by name (`**/*.py`).
+- `grep_files {pattern, path?, include?}` — regex content search, `file:line:` hits.
 - `run_command {command}` — runs in workspace, captures stdout/stderr/exit code,
   timeout, head+tail truncation. Dangerous commands (`rm -rf`, `del`, `format`,
   `shutdown`, `git reset --hard`, …) are **blocked** until the user approves.
-- `web_search {query, max_results?}` — the one online tool (DuckDuckGo, no API
+- `web_search {query, max_results?}` — the online tool (DuckDuckGo, no API
   key, stdlib only). Tries DDG HTML results, falls back to Wikipedia matches
   when DDG bot-walls the request, caps output at ~2.5K chars. Use sparingly:
   search output eats context fast. Upgrade path: add a key-based provider
   (Tavily/Brave) as another `_search_*` function in `tools/web.py`.
+- `web_fetch {url}` — fetch a page as capped readable text.
+
+Every write/edit is undoable (`/undo`, session-scoped). Tool results show as
+one-line `OK:`/`ERROR:` feedback under each `→` call.
 
 ## How the agent loop works
 
@@ -166,10 +183,11 @@ mini-agent/
 │     module), so the registry is the package's `__init__`.
 ├── permissions.py     workspace jail + dangerous-command gate
 ├── config.py          env/.env config, no code changes for new models
-├── tools/filesystem.py  read/write/list
+├── tools/filesystem.py  read/write/edit/list + undo stack
 ├── tools/terminal.py    run_command
-├── tools/web.py         web_search (DDG + Wikipedia fallback)
-├── tests/             mocked, offline
+├── tools/search.py      grep/glob
+├── tools/web.py         web_search (DDG + Wikipedia fallback) + web_fetch
+├── tests/             mocked, offline (test_edit_search.py covers the new tools)
 └── workspace/         agent sandbox
 ```
 
@@ -185,5 +203,5 @@ mini-agent/
 
 ## Roadmap (not yet built)
 
-git, grep/ripgrep, docker, browser, MCP, LSP, subagents, memory, indexing,
+git, docker, browser, MCP, LSP, subagents, sessions, memory, indexing,
 GUI — the registry + context manager are shaped to accept them later.

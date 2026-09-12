@@ -146,7 +146,8 @@ class Agent:
 
     def ask(self, user_text: str,
             on_token: Optional[Callable[[str], None]] = None,
-            on_tool: Optional[Callable[[str, dict], None]] = None) -> AgentResult:
+            on_tool: Optional[Callable[[str, dict], None]] = None,
+            on_result: Optional[Callable[[str, dict, str], None]] = None) -> AgentResult:
         """Run the tool loop until a final answer (no tool call) or a stop."""
         self.ctx.add_user(user_text)
         self._dbg(f"Estimated context: {self.ctx.estimated_tokens()} tokens")
@@ -197,6 +198,8 @@ class Agent:
                     self._dbg("Repeat detected — warned model instead of executing.")
                     break
                 result = execute_tool(name, args, self.cfg.workspace, self.cfg)
+                if on_result:
+                    on_result(name, args, result)
                 self._dbg(f"Tool result: {len(result) // 4} tok; "
                           f"ctx now {self.ctx.estimated_tokens()} tok (pre-add)")
                 self.ctx.add_tool_result(name, args, result)
