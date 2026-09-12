@@ -80,7 +80,10 @@ mini-agent  |  Model: qwen3:8b  |  Context: 8192  |  Workspace: .../workspace
 ✓ ... final answer
 ```
 
-Commands: `/help` `/clear` `/compact` `/init` `/undo` `/context` `/tools` `/model` `/quit`
+Commands: `/help` `/clear` `/compact` `/init` `/undo` `/context` `/tools`
+`/model [name]` (show or switch model) `/thinking [on|off]` (raw output view)
+`/sessions` `/resume <name>` `/export [name[.md]]` `/rename <name>` `/fork [name]`
+`/quit`
 
 One-shot (non-interactive) runs and per-run overrides:
 
@@ -90,6 +93,16 @@ tinyagent -m qwen3-local:latest -w C:\Projects\myapp "list the project layout"
 ```
 
 Mention files inline with `@path` — the contents are attached (capped):
+
+```text
+> fix the bug in @calc.py
+```
+
+Sessions live in `~/.tinyagent/sessions/` as plain JSON (override with
+`$TINYAGENT_HOME`): `/export` saves the current context, `/resume` loads it,
+`/fork` branches it, `/rename` relabels it, `/export notes.md` writes a
+readable transcript instead. Saved sessions rebuild the system prompt on load,
+so they survive tool-list upgrades.
 
 ## Tools
 
@@ -173,7 +186,8 @@ and the full `user → tool → result → tool → answer` loop.
 
 ```
 mini-agent/
-├── main.py            CLI (rich if present, plain fallback)
+├── main.py            CLI (commands, sessions, @file, one-shot mode)
+├── sessions.py        session save/load/list/rename/export (JSON in ~/.tinyagent)
 ├── agent.py           loop + tool-call parsing + minimal system prompt
 ├── ollama.py          native Ollama client (stdlib urllib, streaming)
 ├── context.py         budget, discard-first pruning, compression
