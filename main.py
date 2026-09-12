@@ -43,13 +43,13 @@ def out(text: str = "", style: str = "") -> None:
     print(text)
 
 
-def prompt() -> str:
+def prompt(msg: str = "[bold cyan]> [/]") -> str:
     if RICH:
         try:
-            return console.input("[bold cyan]> [/]")
+            return console.input(msg, markup=False)
         except UnicodeEncodeError:
             pass  # piped output on Windows (cp1252) — fall through
-    return input("> ")
+    return input(re.sub(r"\[.*?\]", "", msg))
 
 
 def out_markdown(text: str) -> None:
@@ -59,23 +59,27 @@ def out_markdown(text: str) -> None:
         print(text)
 
 
-HELP = """Commands:
-  /help          show this help
-  /clear         clear conversation context
-  /compact       summarize session into a compact state (one extra model call)
-  /init          explore workspace and write AGENTS.md
-  /undo          restore the last file written/edited/created
-  /model [name]  show current model, or switch to another local model
-  /thinking [on|off]  show status, or toggle raw model output incl. tool JSON
-  /sessions      list saved sessions
-  /resume <name> load a saved session
-  /export [name[.md]]  save session as JSON (or readable .md transcript)
-  /rename <name> rename the current session
-  /fork [name]   save a copy of this session and continue in it
-  /context       show model / context usage
-  /tools         list available tools
-  /quit          exit
-Type a task to run the agent. @path attaches a file. Tool calls show as →."""
+COMMANDS = [
+    ("/help", "show this help"),
+    ("/clear", "clear conversation context"),
+    ("/compact", "summarize session into a compact state"),
+    ("/init", "explore workspace and write AGENTS.md"),
+    ("/undo", "restore the last written/edited file"),
+    ("/model", "pick a local model from a list (or /model <name>)"),
+    ("/thinking", "toggle raw model output incl. tool JSON"),
+    ("/sessions", "list saved sessions"),
+    ("/resume", "pick a saved session to load"),
+    ("/export", "save session as JSON (or .md transcript)"),
+    ("/rename", "rename the current session"),
+    ("/fork", "branch this session and continue in the copy"),
+    ("/context", "show model / context usage"),
+    ("/tools", "list available tools"),
+    ("/quit", "exit"),
+]
+
+HELP = ("Commands (type / for a pickable menu):\n"
+        + "\n".join(f"  {n:<10} {d}" for n, d in COMMANDS)
+        + "\nType a task to run the agent. @path attaches a file.")
 
 
 INIT_TASK = (
@@ -84,6 +88,77 @@ INIT_TASK = (
     "the project is, how to build/run/test it, key files, and conventions "
     "for future changes. Keep it under 60 lines."
 )
+
+
+def pick(title: str, items: list[str],
+         notes: list[str] | None = None) -> str | None:
+    """Numbered menu. Returns the chosen item, or None on cancel/empty."""
+    out(title)
+    for i, item in enumerate(items, 1):
+        extra = f"  — {notes[i - 1]}" if notes else ""
+        out(f"  {i}. {item}{extra}")
+    try:
+        sel = prompt("Choose [number, name, or Enter to cancel]: ").strip()
+    except (KeyboardInterrupt, EOFError):
+        return None
+    if not sel:
+        return None
+    if sel.isdigit() and 1 <= int(sel) <= len(items):
+        return items[int(sel) - 1]
+    if sel in items:
+        return sel
+    prefixed = [it for it in items if it.startswith(sel)]
+    return prefixed[0] if len(prefixed) == 1 else None
+
+
+def resolve_command(line: str, cfg: Config, client: OllamaClient) -> str | None:
+    """Expand menu invocations into concrete commands. None = reprompt."""
+    names = [n for n, _ in COMMANDS]
+    if line == "/":
+        choice = pick("Commands:", names, [d for _, d in COMMANDS])
+        # Recurse so bare picks ("/model", "/resume", "/rename") hit
+        # their pickers instead of falling through to the branches.
+        return resolve_command(choice, cfg, client) if choice else None
+    if line == "/model":
+        try:
+            models = client.list_models()
+        except OllamaError as e:
+            out(str(e), style="red")
+            return None
+        if not models:
+            out("No local models. Pull one first: ollama pull qwen3:8b")
+            return None
+        labels = [m + ("  * current" if m == cfg.model else "") for m in models]
+        choice = pick("Local models:", labels)
+        if not choice:
+            return None
+        return "/model " + models[labels.index(choice)]
+    if line == "/resume":
+        session_names = [s["name"] for s in list_sessions()]
+        if not session_names:
+            out("(no saved sessions)")
+            return None
+        choice = pick("Sessions:", session_names)
+        return f"/resume {choice}" if choice else None
+    if line == "/rename":
+        try:
+            new = prompt("New session name: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            return None
+        return f"/rename {new}" if new else None
+    if line.startswith("/"):
+        first = line.split(None, 1)[0]
+        if first not in set(names) | {"/exit", "/q"}:
+            cands = [(n, d) for n, d in COMMANDS if n.startswith(first)]
+            if not cands:
+                out(f"Unknown command: {line}. Type / for the list.")
+                return None
+            choice = pick("Did you mean:",
+                          [n for n, _ in cands], [d for _, d in cands])
+            if not choice:
+                return None
+            return resolve_command(choice + line[len(first):], cfg, client)
+    return line
 
 
 def cmd_context(agent: Agent, cfg: Config) -> None:
@@ -248,6 +323,9 @@ def main(argv: list[str] | None = None) -> None:
             out("\nBye.")
             break
         line = line.strip()
+        if not line:
+            continue
+        line = resolve_command(line, cfg, client)
         if not line:
             continue
         if line in ("/quit", "/exit", "/q"):

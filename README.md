@@ -98,6 +98,15 @@ Mention files inline with `@path` — the contents are attached (capped):
 > fix the bug in @calc.py
 ```
 
+Type `/` on its own for a numbered menu of every command (pick by number or
+name); partial typing like `/mod` offers matching commands. Bare `/model`
+lists your local Ollama models with the current one starred — pick one to
+switch mid-session (`/model <name>` switches directly).
+
+```text
+> fix the bug in @calc.py
+```
+
 Sessions live in `~/.tinyagent/sessions/` as plain JSON (override with
 `$TINYAGENT_HOME`): `/export` saves the current context, `/resume` loads it,
 `/fork` branches it, `/rename` relabels it, `/export notes.md` writes a

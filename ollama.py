@@ -60,6 +60,19 @@ class OllamaClient:
                 "Start it with `ollama serve` and pull a model, e.g. `ollama pull qwen3:8b`."
             )
 
+    def list_models(self) -> list[str]:
+        """Local model names from /api/tags. Raises OllamaError."""
+        try:
+            req = urllib.request.Request(self._url("/api/tags"), method="GET")
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            return [m.get("name", "") for m in data.get("models", [])
+                    if m.get("name")]
+        except Exception as e:  # noqa: BLE001 - caller reports it
+            raise OllamaError(
+                f"Cannot list models at {self.host}: {e}. "
+                "Is `ollama serve` running?") from e
+
     def chat(self, messages: list[dict], stream: bool = False,
              on_token: Optional[Callable[[str], None]] = None) -> str:
         """Non-streaming by default. If stream=True, calls on_token per chunk."""
