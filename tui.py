@@ -119,10 +119,10 @@ class TuiApp(App):
         self.session = {"name": "default"}
         self.show_thinking = False
         self._busy = False
-        # acc: full turn text (fence detection). pending: unflushed,
-        # fence-free text. RichLog gives each write() its own visual
-        # line, so tokens are batched and only complete lines flushed.
-        self._turn = {"acc": "", "pending": ""}
+        # acc: full turn text (fence detection + final flush source).
+        # pending: unflushed fence-free text for line-batched streaming.
+        # printed: chars of acc already written (flush = acc[printed:]).
+        self._turn = {"acc": "", "pending": "", "printed": 0}
         self._matches: list[str] = []
         self.top_text = ""
         self.mirror: list[str] = []  # plain-text transcript (tests, export)
@@ -475,7 +475,7 @@ class TuiApp(App):
             self._status("busy — wait for the current task (Ctrl+Q quits)")
             return
         self._busy = True
-        self._turn = {"acc": "", "pending": ""}
+        self._turn = {"acc": "", "pending": "", "printed": 0}
         self.query_one("#cmd-input", Input).disabled = True
         self._status("● thinking… (Ctrl+Q quits)")
         asyncio.create_task(self._run_task(line))
@@ -531,15 +531,20 @@ class TuiApp(App):
         if cut:
             self._w(pending[:cut])
             st["pending"] = pending[cut:]
+            st["printed"] += cut
 
     def _flush_turn(self) -> None:
-        st = self._turn
-        if st["pending"]:
-            self._w(st["pending"])
-            st["pending"] = ""
+        # Everything not yet live-printed (line remainder + any text
+        # held back for fence inspection). This is what the old code
+        # dropped: replies starting with ``` lost their entire body.
+        rest = self._turn["acc"][self._turn["printed"]:]
+        if rest:
+            self._w(rest)
+            self._turn["pending"] = ""
+            self._turn["printed"] = len(self._turn["acc"])
 
     def _tool(self, name: str, args: dict) -> None:
-        self._turn = {"acc": "", "pending": ""}
+        self._turn = {"acc": "", "pending": "", "printed": 0}
         brief = str(args)
         if len(brief) > 160:
             brief = brief[:160] + "..."

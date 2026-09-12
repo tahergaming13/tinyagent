@@ -212,7 +212,20 @@ async def test_fence_stays_hidden_but_text_flows():
         # Pre-fence line flowed; fence content held back.
         assert app.mirror[base:] == ["thinking out loud\n"]
         app._tool("read_file", {"path": "a.py"})  # turn ends: state reset
-        assert app._turn == {"acc": "", "pending": ""}
+        assert app._turn == {"acc": "", "pending": "", "printed": 0}
+
+
+async def test_fenced_answer_fully_flushed():
+    # Regression: replies starting with ``` lost their ENTIRE body —
+    # suppressed tokens never entered the flush buffer ("done, no output").
+    app = _app()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        base = len(app.mirror)
+        for ch in "```\nhaiku line\n```":
+            app._tok(ch)
+        app._flush_turn()
+        assert "".join(app.mirror[base:]) == "```\nhaiku line\n```"
 
 
 async def test_undo_and_context_commands():
