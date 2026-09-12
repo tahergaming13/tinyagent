@@ -175,6 +175,15 @@ class Agent:
                 self._dbg(err)
                 return AgentResult(err, calls, "error")
 
+            if not text.strip():
+                # Some models answer refusals/edge cases with zero tokens.
+                # Say so explicitly instead of showing a silent blank.
+                self._dbg("Model returned an empty response.")
+                msg = ("[empty response from model — it produced no text. "
+                       "Rephrase the task or try again.]")
+                self.ctx.add_assistant(msg)
+                return AgentResult(msg, calls, "error")
+
             tool_calls = parse_tool_calls(text)
             if not tool_calls:
                 self.ctx.add_assistant(text)

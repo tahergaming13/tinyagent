@@ -85,6 +85,15 @@ def test_full_loop_tool_then_answer():
     assert any("print(1)" in m.get("content", "") for m in agent.ctx.messages)
 
 
+def test_empty_response_surfaced_not_silent():
+    cfg = _cfg()
+    fake = FakeClient(["   "])
+    agent = Agent(fake, cfg)
+    res = agent.ask("do something")
+    assert res.stopped == "error", res
+    assert "empty response" in res.answer
+
+
 def test_max_iterations_stops_gracefully():
     cfg = _cfg(max_tool_calls=2)
     fake = FakeClient([
