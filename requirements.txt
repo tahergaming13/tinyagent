@@ -1,0 +1,5 @@
+# Runtime deps: only rich (terminal UI). Everything else is stdlib.
+# (HTTP uses stdlib urllib; no httpx/requests needed.)
+rich>=13
+# Test only:
+pytest>=8

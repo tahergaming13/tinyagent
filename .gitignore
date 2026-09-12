@@ -1,0 +1,10 @@
+# Local config (may contain API keys later) — never commit.
+.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Agent workspace is a sandbox, not source.
+workspace/
