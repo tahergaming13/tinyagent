@@ -12,6 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from rich.panel import Panel
 from rich.text import Text
 from textual import events
 from textual.app import App, ComposeResult
@@ -94,13 +95,17 @@ class AskModal(ModalScreen):
 
 class TuiApp(App):
     CSS = """
-    #topbar { height: 1; background: $primary-darken-2; color: $text; }
-    #log { height: 1fr; }
-    #suggest { height: auto; max-height: 9; border-top: solid $primary; }
+    Screen { background: $background; }
+    #topbar { height: 1; background: $primary-darken-3; padding: 0 1; }
+    #log { height: 1fr; padding: 0 1; scrollbar-size: 1 1; }
+    #suggest { height: auto; max-height: 10; border: solid $accent;
+               background: $surface; }
     #suggest.hidden { display: none; }
-    #status { height: 1; color: $text-muted; }
-    #cmd-input { height: 3; }
-    #hintbar { height: 1; color: $text-muted; }
+    #status { height: 1; color: $text-muted; padding: 0 1; }
+    #cmd-input { height: 3; border: solid $primary; background: $surface; }
+    #cmd-input:focus { border: solid $accent; }
+    #cmd-input:disabled { opacity: 0.6; }
+    #hintbar { height: 1; color: $text-muted; padding: 0 1; }
     """
 
     BINDINGS = [("ctrl+q", "quit_app", "Quit")]
@@ -142,7 +147,20 @@ class TuiApp(App):
             ok, msg = False, str(e)
         self._refresh_top()
         self._status(msg if ok else msg + " — /help works offline")
-        self._w("Type /help for commands.\n")
+        self._hero()
+
+    def _hero(self) -> None:
+        body = Text()
+        body.append("tinyagent", style="bold cyan")
+        body.append(" — your local coding agent\n", style="dim")
+        body.append(f"Model  {self.cfg.model}\n")
+        body.append(f"Space  {os.path.abspath(self.cfg.workspace)}\n")
+        body.append("Type a task · @file attaches a file · / opens commands",
+                    style="dim")
+        self.query_one("#log", RichLog).write(
+            Panel(body, title="welcome", border_style="cyan",
+                  padding=(0, 1)))
+        self.mirror.append(f"welcome · {self.cfg.model}")
 
     def action_quit_app(self) -> None:
         self.exit()
@@ -164,10 +182,17 @@ class TuiApp(App):
 
     def _refresh_top(self) -> None:
         s = self.agent.ctx.stats()
-        self.top_text = (f"tinyagent · {self.cfg.model} · "
-                         f"{self.session['name']} · "
-                         f"ctx ~{s['tokens']:,}/{self.cfg.context_size:,}")
-        self._status_bar(self.top_text)
+        ratio = s["tokens"] / max(1, self.cfg.context_size)
+        color = "green" if ratio < 0.6 else ("yellow" if ratio < 0.85
+                                            else "red")
+        bar = Text()
+        bar.append(" tinyagent ", style="bold black on cyan")
+        bar.append(f"  {self.cfg.model}  ", style="bold")
+        bar.append(f"{self.session['name']}  ", style="dim")
+        bar.append(f"ctx ~{s['tokens']:,}/{self.cfg.context_size:,}",
+                   style=color)
+        self.top_text = bar.plain
+        self._status_bar(bar)
 
     def _status_bar(self, text: str) -> None:
         try:
@@ -219,6 +244,7 @@ class TuiApp(App):
         self.query_one("#suggest", ListView).add_class("hidden")
         if not line:
             return
+        self._w(Text(f"> {line}", style="bold cyan"))
         if line.startswith("/"):
             await self._dispatch(line)
         else:
@@ -292,8 +318,34 @@ class TuiApp(App):
             self._w("Tools: " + ", ".join(TOOLS))
         elif cmd in ("/quit", "/exit", "/q"):
             self.exit()
+        elif cmd == "/":
+            self.push_screen(
+                PickModal("Commands:",
+                          [f"{n:<10} {d}" for n, d in COMMANDS]),
+                self._after_command_pick)
         else:
-            self._w(f"Unknown command: {line}. Type / for the menu.")
+            matches = [(n, d) for n, d in COMMANDS if n.startswith(cmd)]
+            if len(matches) == 1:
+                await self._dispatch(matches[0][0]
+                                     + (f" {arg}" if arg else ""))
+            elif matches:
+                labels = [f"{n:<10} {d}" for n, d in matches]
+                names = [n for n, _ in matches]
+                suffix = f" {arg}" if arg else ""
+
+                def picked(choice: str | None) -> None:
+                    if choice:
+                        asyncio.create_task(
+                            self._dispatch(names[labels.index(choice)]
+                                           + suffix))
+
+                self.push_screen(PickModal("Did you mean:", labels), picked)
+            else:
+                self._w(f"Unknown command: {line}. Type / for the menu.")
+
+    def _after_command_pick(self, choice: str | None) -> None:
+        if choice:  # labels are "cmd  — desc"; recover the command token
+            asyncio.create_task(self._dispatch(choice.split()[0]))
 
     # -- command implementations -----------------------------------------
     def _switch_model(self, name: str) -> None:

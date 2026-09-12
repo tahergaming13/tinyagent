@@ -58,7 +58,7 @@ async def test_mounts_with_banner_and_help(monkeypatch):
         await pilot.pause()
         assert "tinyagent" in app.top_text
         assert "fake-model" in app.top_text
-        assert "/help" in _text(app)
+        assert "welcome" in _text(app)
 
 
 async def test_slash_dropdown_filters():
@@ -103,6 +103,7 @@ async def test_task_streams_answer():
             await asyncio.sleep(0.05)
             if "CANNED-REPLY-42" in _text(app):
                 break
+        assert "> hello" in _text(app)  # user input echoed
         assert "CANNED-REPLY-42" in _text(app)
         assert "ctx ~" in app.top_text  # header meter updated
 
@@ -119,6 +120,44 @@ async def test_model_modal_switches():
         await pilot.pause()
         assert app.cfg.model == "other-model"
         assert "Switched to model: other-model" in _text(app)
+
+
+async def test_partial_command_runs_single_match():
+    from tui import PickModal
+    app = _app()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"/mod", "enter")
+        await pilot.pause()
+        # single match (/model) → model picker modal, not "Unknown command"
+        assert isinstance(app.screen, PickModal)
+        assert "Unknown command" not in _text(app)
+
+
+async def test_slash_menu_dispatches_choice():
+    from tui import PickModal
+    app = _app()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"/", "enter")
+        await pilot.pause()
+        assert isinstance(app.screen, PickModal)
+        await pilot.press("enter")  # first item: /help
+        for _ in range(100):
+            await asyncio.sleep(0.05)
+            if "pick a local model" in _text(app):
+                break
+        assert "pick a local model" in _text(app)  # /help output shown
+
+
+async def test_partial_multi_match_offers_modal():
+    from tui import PickModal
+    app = _app()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"/t", "enter")
+        await pilot.pause()
+        assert isinstance(app.screen, PickModal)  # /thinking//tools/…
 
 
 async def test_undo_and_context_commands():

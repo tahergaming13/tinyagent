@@ -48,7 +48,9 @@ tinyagent --tui
 Top bar (model · session · live context meter), scrolling transcript with
 streaming answers, `/` autocomplete dropdown (↑↓ + Enter to complete),
 modal pickers for `/model` and `/resume`, and a status line — all 15 commands
-and 9 tools work exactly as in the classic CLI. The agent runs in a
+and 9 tools work exactly as in the classic CLI. Typing a partial command and
+hitting Enter runs it when the match is unique, otherwise opens a chooser;
+bare `/` opens the full command menu. The agent runs in a
 background thread so the UI never freezes; `Ctrl+Q` quits anytime.
 
 ## Ollama setup
