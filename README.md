@@ -3,7 +3,7 @@
 A minimal terminal coding agent that runs **entirely against a local Ollama model**.
 Built from first principles for **small LLMs (~7–8B) with ~8K context windows**.
 
-No LangChain, no frameworks, no cloud. Four tools, one loop, one context budget.
+No LangChain, no frameworks, no cloud. Five tools, one loop, one context budget.
 
 ```
 User → CLI → Agent → Ollama → tool call? ──YES──▶ execute → context ──▶ Ollama …
@@ -72,7 +72,7 @@ mini-agent  |  Model: qwen3:8b  |  Context: 8192  |  Workspace: .../workspace
 
 Commands: `/help` `/clear` `/context` `/tools` `/model` `/quit`
 
-## Tools (v0.1: exactly four)
+## Tools (v0.1: four local tools + web search)
 
 - `read_file {path, start_line?, end_line?}` — numbered lines, encoding-tolerant,
   flags truncation, range reads for big files.
@@ -82,6 +82,11 @@ Commands: `/help` `/clear` `/context` `/tools` `/model` `/quit`
 - `run_command {command}` — runs in workspace, captures stdout/stderr/exit code,
   timeout, head+tail truncation. Dangerous commands (`rm -rf`, `del`, `format`,
   `shutdown`, `git reset --hard`, …) are **blocked** until the user approves.
+- `web_search {query, max_results?}` — the one online tool (DuckDuckGo, no API
+  key, stdlib only). Tries DDG HTML results, falls back to Wikipedia matches
+  when DDG bot-walls the request, caps output at ~2.5K chars. Use sparingly:
+  search output eats context fast. Upgrade path: add a key-based provider
+  (Tavily/Brave) as another `_search_*` function in `tools/web.py`.
 
 ## How the agent loop works
 
@@ -153,6 +158,7 @@ mini-agent/
 ├── config.py          env/.env config, no code changes for new models
 ├── tools/filesystem.py  read/write/list
 ├── tools/terminal.py    run_command
+├── tools/web.py         web_search (DDG + Wikipedia fallback)
 ├── tests/             mocked, offline
 └── workspace/         agent sandbox
 ```
@@ -167,7 +173,7 @@ mini-agent/
 ✓ exit 0 → "Done: app/main.py serves GET / → {hello: world}."
 ```
 
-## Roadmap (not in v0.1)
+## Roadmap (not yet built)
 
-git, grep/ripgrep, web search, docker, MCP, LSP, subagents, memory, indexing,
+git, grep/ripgrep, docker, browser, MCP, LSP, subagents, memory, indexing,
 GUI — the registry + context manager are shaped to accept them later.

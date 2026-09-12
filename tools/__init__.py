@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from tools.filesystem import list_files, read_file, write_file
 from tools.terminal import run_command
+from tools.web import web_search
 
 # Compact schemas shown to the model exactly once (kept tiny for 7B models).
 TOOL_SCHEMAS = [
@@ -28,6 +29,11 @@ TOOL_SCHEMAS = [
         "name": "run_command",
         "desc": "Run a shell command in the workspace, captures stdout/stderr/exit code.",
         "args": {"command": "string (required)"},
+    },
+    {
+        "name": "web_search",
+        "desc": "Search the web (DuckDuckGo, no key). Use sparingly: results eat context.",
+        "args": {"query": "string (required)", "max_results": "int?, default 5"},
     },
 ]
 
@@ -58,11 +64,18 @@ def _run(a: dict, ws: str, cfg) -> str:
                        max_output=cfg.max_command_output)
 
 
+def _web(a: dict, ws: str, cfg) -> str:
+    if "query" not in a:
+        return "ERROR: web_search needs {query}."
+    return web_search(a["query"], a.get("max_results", 5))
+
+
 _DISPATCH: dict[str, Callable[[dict, str, Any], str]] = {
     "read_file": _read,
     "write_file": _write,
     "list_files": _list,
     "run_command": _run,
+    "web_search": _web,
 }
 
 TOOLS = tuple(_DISPATCH.keys())
