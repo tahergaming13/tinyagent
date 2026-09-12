@@ -150,17 +150,19 @@ class TuiApp(App):
         self._hero()
 
     def _hero(self) -> None:
+        # No model/session lines here on purpose: those change at runtime
+        # (/model, /rename, /resume) and the top bar is the live indicator.
+        # A static hero never goes stale.
         body = Text()
         body.append("tinyagent", style="bold cyan")
         body.append(" — your local coding agent\n", style="dim")
-        body.append(f"Model  {self.cfg.model}\n")
         body.append(f"Space  {os.path.abspath(self.cfg.workspace)}\n")
         body.append("Type a task · @file attaches a file · / opens commands",
                     style="dim")
         self.query_one("#log", RichLog).write(
             Panel(body, title="welcome", border_style="cyan",
                   padding=(0, 1)))
-        self.mirror.append(f"welcome · {self.cfg.model}")
+        self.mirror.append("welcome")
 
     def action_quit_app(self) -> None:
         self.exit()
@@ -351,7 +353,8 @@ class TuiApp(App):
     def _switch_model(self, name: str) -> None:
         self.cfg.model = self.client.model = name
         self._refresh_top()
-        self._w(f"Switched to model: {name}")
+        self._w(f"Switched to model: {name} "
+                "(context kept — /clear for a fresh start)")
 
     async def _model_modal(self) -> None:
         try:

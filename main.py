@@ -368,7 +368,7 @@ def main(argv: list[str] | None = None) -> None:
             else:
                 cfg.model = client.model = parts[1].strip()
                 out(f"Switched to model: {cfg.model} "
-                    f"(availability shows on next task)")
+                    f"(context kept — /clear for a fresh start)")
             continue
         if line == "/thinking" or line.startswith("/thinking "):
             parts = line.split(None, 1)

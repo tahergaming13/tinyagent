@@ -59,6 +59,9 @@ async def test_mounts_with_banner_and_help(monkeypatch):
         assert "tinyagent" in app.top_text
         assert "fake-model" in app.top_text
         assert "welcome" in _text(app)
+        # Hero must not bake in live state (model/session change at runtime;
+        # the top bar is the single source of truth).
+        assert "Model  fake-model" not in _text(app)
 
 
 async def test_slash_dropdown_filters():
