@@ -11,5 +11,8 @@ __pycache__/
 build/
 dist/
 
+# External indexer caches
+.ua/
+
 # Agent workspace is a sandbox, not source.
 workspace/
