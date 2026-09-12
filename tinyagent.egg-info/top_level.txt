@@ -1,0 +1,7 @@
+agent
+config
+context
+main
+ollama
+permissions
+tools

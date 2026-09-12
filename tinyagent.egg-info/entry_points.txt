@@ -1,0 +1,2 @@
+[console_scripts]
+tinyagent = main:main

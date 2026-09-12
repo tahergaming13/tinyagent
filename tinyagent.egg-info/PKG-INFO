@@ -1,3 +1,11 @@
+Metadata-Version: 2.4
+Name: tinyagent
+Version: 0.2.0
+Summary: Minimal local Ollama terminal coding agent for small LLMs
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: rich>=13
+
 # mini-agent
 
 A minimal terminal coding agent that runs **entirely against a local Ollama model**.
@@ -26,18 +34,8 @@ Dumb infrastructure + smart-enough model.
 
 ```bash
 cd mini-agent
-python -m pip install -e .   # installs the `tinyagent` command (+ rich)
+python -m pip install -r requirements.txt   # only rich + pytest
 ```
-
-Then open a **new** terminal (so PATH refreshes) and run it from anywhere:
-
-```bash
-tinyagent
-```
-
-The workspace defaults to `./workspace` under your current directory —
-`cd` to your project first, or set `WORKSPACE` in `.env`.
-(Without install: `python -m pip install -r requirements.txt` + `python main.py`.)
 
 ## Ollama setup
 
@@ -67,7 +65,7 @@ Copy `.env.example` to `.env` and edit — or just set env vars:
 ## Usage
 
 ```bash
-tinyagent
+python main.py
 ```
 
 ```
