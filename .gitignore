@@ -6,5 +6,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
+# Build artifacts
+*.egg-info/
+build/
+dist/
+
 # Agent workspace is a sandbox, not source.
 workspace/
