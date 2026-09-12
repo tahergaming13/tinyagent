@@ -163,6 +163,32 @@ async def test_partial_multi_match_offers_modal():
         assert isinstance(app.screen, PickModal)  # /thinking//tools/…
 
 
+async def test_tokens_batch_into_lines():
+    # Regression: each RichLog.write() is its own visual line, so raw
+    # per-token writes stacked every token on a separated line.
+    app = _app()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        base = len(app.mirror)
+        for ch in "hello world\nsecond line":
+            app._tok(ch)
+        app._flush_turn()
+        assert app.mirror[base:] == ["hello world\n", "second line"]
+
+
+async def test_fence_stays_hidden_but_text_flows():
+    app = _app()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        base = len(app.mirror)
+        for ch in "thinking out loud\n```tool_call\n":
+            app._tok(ch)
+        # Pre-fence line flowed; fence content held back.
+        assert app.mirror[base:] == ["thinking out loud\n"]
+        app._tool("read_file", {"path": "a.py"})  # turn ends: state reset
+        assert app._turn == {"acc": "", "pending": ""}
+
+
 async def test_undo_and_context_commands():
     app = _app()
     async with app.run_test() as pilot:

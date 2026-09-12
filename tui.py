@@ -118,7 +118,10 @@ class TuiApp(App):
         self.session = {"name": "default"}
         self.show_thinking = False
         self._busy = False
-        self._turn = {"acc": "", "printed": 0}
+        # acc: full turn text (fence detection). pending: unflushed,
+        # fence-free text. RichLog gives each write() its own visual
+        # line, so tokens are batched and only complete lines flushed.
+        self._turn = {"acc": "", "pending": ""}
         self._matches: list[str] = []
         self.top_text = ""
         self.mirror: list[str] = []  # plain-text transcript (tests, export)
@@ -468,7 +471,7 @@ class TuiApp(App):
             self._status("busy — wait for the current task (Ctrl+Q quits)")
             return
         self._busy = True
-        self._turn = {"acc": "", "printed": 0}
+        self._turn = {"acc": "", "pending": ""}
         self.query_one("#cmd-input", Input).disabled = True
         self._status("● thinking… (Ctrl+Q quits)")
         asyncio.create_task(self._run_task(line))
@@ -486,9 +489,7 @@ class TuiApp(App):
         # Back on the app thread here: direct widget calls again.
         if result is not None:
             if result.stopped == "answer":
-                rest = self._turn["acc"][self._turn["printed"]:]
-                if rest:
-                    self._w(rest)
+                self._flush_turn()
                 self._w("")
             else:
                 self._w(result.answer)
@@ -510,11 +511,31 @@ class TuiApp(App):
         st["acc"] += tok
         if not self.show_thinking and "```" in st["acc"]:
             return  # hold back: might be an internal tool_call fence
-        self._w(tok)
-        st["printed"] += len(tok)
+        st["pending"] += tok
+        self._flush_lines()
+
+    def _flush_lines(self) -> None:
+        """Write out complete lines (or long fragments) from the buffer."""
+        st = self._turn
+        pending = st["pending"]
+        cut = pending.rfind("\n") + 1
+        if not cut and len(pending) > 200:
+            # No newline in sight: break at a word boundary so long
+            # lines still stream instead of appearing all at once.
+            sp = pending.rfind(" ", 0, 200)
+            cut = (sp + 1) if sp > 0 else 200
+        if cut:
+            self._w(pending[:cut])
+            st["pending"] = pending[cut:]
+
+    def _flush_turn(self) -> None:
+        st = self._turn
+        if st["pending"]:
+            self._w(st["pending"])
+            st["pending"] = ""
 
     def _tool(self, name: str, args: dict) -> None:
-        self._turn = {"acc": "", "printed": 0}
+        self._turn = {"acc": "", "pending": ""}
         brief = str(args)
         if len(brief) > 160:
             brief = brief[:160] + "..."
