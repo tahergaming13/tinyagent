@@ -283,11 +283,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("task", nargs="*", help="one-shot task (non-interactive)")
     p.add_argument("-m", "--model", help="override OLLAMA_MODEL for this run")
     p.add_argument("-w", "--workspace", help="override WORKSPACE for this run")
+    p.add_argument("--tui", action="store_true",
+                   help="launch the full-screen terminal UI")
     return p
 
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
+    if args.tui:
+        from tui import run_tui
+        run_tui(model_override=args.model,
+                workspace_override=args.workspace)
+        return
     cfg = Config()
     if args.model:
         cfg.model = args.model

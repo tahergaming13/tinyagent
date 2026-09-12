@@ -39,6 +39,18 @@ The workspace defaults to `./workspace` under your current directory —
 `cd` to your project first, or set `WORKSPACE` in `.env`.
 (Without install: `python -m pip install -r requirements.txt` + `python main.py`.)
 
+## Full-screen UI (OpenCode-style)
+
+```bash
+tinyagent --tui
+```
+
+Top bar (model · session · live context meter), scrolling transcript with
+streaming answers, `/` autocomplete dropdown (↑↓ + Enter to complete),
+modal pickers for `/model` and `/resume`, and a status line — all 15 commands
+and 9 tools work exactly as in the classic CLI. The agent runs in a
+background thread so the UI never freezes; `Ctrl+Q` quits anytime.
+
 ## Ollama setup
 
 ```bash
@@ -195,7 +207,8 @@ and the full `user → tool → result → tool → answer` loop.
 
 ```
 mini-agent/
-├── main.py            CLI (commands, sessions, @file, one-shot mode)
+├── main.py            classic CLI (commands, sessions, @file, one-shot mode)
+├── tui.py             full-screen Textual UI (same agent underneath)
 ├── sessions.py        session save/load/list/rename/export (JSON in ~/.tinyagent)
 ├── agent.py           loop + tool-call parsing + minimal system prompt
 ├── ollama.py          native Ollama client (stdlib urllib, streaming)

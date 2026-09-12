@@ -1,5 +1,7 @@
-# Runtime deps: only rich (terminal UI). Everything else is stdlib.
-# (HTTP uses stdlib urllib; no httpx/requests needed.)
+# Runtime deps: rich (classic CLI) + textual (full-screen --tui).
+# Everything else is stdlib (HTTP uses urllib; no httpx/requests needed).
 rich>=13
+textual>=8
 # Test only:
 pytest>=8
+pytest-asyncio>=1
