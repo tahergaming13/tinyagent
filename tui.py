@@ -21,6 +21,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Label, ListItem, ListView, RichLog, Static
 
 from agent import Agent
+from clipboard import describe_copy
 from config import Config
 from main import (COMMANDS, INIT_TASK, apply_session, expand_mentions,
                   snapshot)
@@ -312,6 +313,9 @@ class TuiApp(App):
                     AskModal("Fork as (Enter for default):",
                              self.session["name"] + "-fork"),
                     lambda v: self._fork(v or self.session["name"] + "-fork"))
+        elif cmd == "/copy":
+            ok, msg = describe_copy(self.agent.ctx.messages, arg)
+            self._w(Text(msg, style="red") if not ok else msg)
         elif cmd == "/context":
             s = self.agent.ctx.stats()
             self._w(f"Model: {self.cfg.model}\n"

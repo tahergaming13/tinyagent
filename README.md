@@ -195,7 +195,24 @@ Example session (classic CLI):
 Commands: `/help` `/clear` `/compact` `/init` `/undo` `/context` `/tools`
 `/model [name]` (show, pick, or switch model) `/thinking [on|off]`
 `/sessions` `/resume <name>` `/export [name[.md]]` `/rename <name>` `/fork [name]`
-`/quit`
+`/copy [N|all]` `/quit`
+
+## Copy & paste
+
+The fullscreen TUI captures the mouse, so normal text selection doesn't reach
+it. Two ways out:
+
+- **Copy an answer:** `/copy` copies the last answer, `/copy 2` the one
+  before it, `/copy all` the whole transcript. Works in both UIs.
+- **Select manually:** hold **Shift** while dragging in Windows Terminal,
+  iTerm2, GNOME Terminal, or kitty — that bypasses the app and selects
+  with the terminal itself.
+
+Pasting needs nothing special: `Ctrl+V` / right-click pastes into the input
+via bracketed paste on all three systems.
+
+> Linux only: clipboard copy needs a backend — `sudo apt install xclip`
+> (X11) or `wl-clipboard` (Wayland). Windows and macOS work out of the box.
 
 One-shot (non-interactive) runs and per-run overrides:
 
@@ -320,6 +337,7 @@ agent loop, sessions, CLI menus, headless TUI runs).
 ```
 tinyagent/
 ├── main.py              classic CLI (commands, sessions, @file, one-shot mode)
+├── clipboard.py         /copy helpers (pyperclip, transcript formatting)
 ├── tui.py               full-screen Textual UI (same agent underneath)
 ├── sessions.py          session save/load/list/rename/export (JSON in ~/.tinyagent)
 ├── agent.py             loop + tool-call parsing + minimal system prompt

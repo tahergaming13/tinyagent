@@ -76,7 +76,8 @@ async def test_slash_dropdown_filters():
         assert app._matches == ["/model"]
         inp.value = "/"
         await pilot.pause()
-        assert len(app._matches) == 15
+        from main import COMMANDS
+        assert len(app._matches) == len(COMMANDS)
 
 
 async def test_tools_command_prints():
@@ -151,6 +152,31 @@ async def test_slash_menu_dispatches_choice():
             if "pick a local model" in _text(app):
                 break
         assert "pick a local model" in _text(app)  # /help output shown
+
+
+async def test_copy_command_copies_last_answer():
+    import sys as _sys
+    import types as _types
+    seen = {}
+    mod = _types.ModuleType("pyperclip")
+    mod.copy = lambda text: seen.setdefault("text", text)
+    app = _app(replies=["COPY-ME-99"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"hi", "enter")
+        for _ in range(200):
+            await asyncio.sleep(0.05)
+            if "COPY-ME-99" in _text(app):
+                break
+        assert "COPY-ME-99" in _text(app)
+        _sys.modules["pyperclip"] = mod
+        try:
+            await pilot.press(*"/copy", "enter")
+            await pilot.pause()
+        finally:
+            del _sys.modules["pyperclip"]
+        assert "Copied answer #1" in _text(app)
+        assert seen.get("text") == "COPY-ME-99"
 
 
 async def test_partial_multi_match_offers_modal():

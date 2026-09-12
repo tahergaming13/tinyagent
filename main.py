@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from agent import Agent  # noqa: E402
+from clipboard import describe_copy  # noqa: E402
 from config import Config  # noqa: E402
 from ollama import OllamaClient, OllamaError  # noqa: E402
 from tools import TOOLS  # noqa: E402
@@ -72,6 +73,7 @@ COMMANDS = [
     ("/export", "save session as JSON (or .md transcript)"),
     ("/rename", "rename the current session"),
     ("/fork", "branch this session and continue in the copy"),
+    ("/copy", "copy last answer to clipboard (N|all)"),
     ("/context", "show model / context usage"),
     ("/tools", "list available tools"),
     ("/quit", "exit"),
@@ -441,6 +443,12 @@ def main(argv: list[str] | None = None) -> None:
                 continue
             session["name"] = new
             out(f"Forked into '{new}' ({p}). Continuing here.")
+            continue
+        if line == "/copy" or line.startswith("/copy "):
+            parts = line.split(None, 1)
+            ok, msg = describe_copy(agent.ctx.messages,
+                                    parts[1].strip() if len(parts) > 1 else "")
+            out(msg, style="" if ok else "red")
             continue
         if line.startswith("/"):
             out(f"Unknown command: {line}. Try /help.")

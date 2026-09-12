@@ -1,7 +1,9 @@
-# Runtime deps: rich (classic CLI) + textual (full-screen --tui).
+# Runtime deps: rich (classic CLI) + textual (full-screen --tui) +
+# pyperclip (/copy command).
 # Everything else is stdlib (HTTP uses urllib; no httpx/requests needed).
 rich>=13
 textual>=8
+pyperclip>=1.9
 # Test only:
 pytest>=8
 pytest-asyncio>=1
